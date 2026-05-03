@@ -1,0 +1,74 @@
+name: CI/CD to Azure VM via ACR
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  IMAGE_NAME: chatapp
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # 🔢 Generate unique version tag (using timestamp or GitHub SHA)
+      - name: Generate Version Tag
+        run: |
+          VERSION=v$(date +%s)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Generated version: $VERSION"
+
+      # 🔐 Login to ACR (Using official Azure Action)
+      - name: Login to ACR
+        uses: azure/docker-login@v1
+        with:
+          login-server: ${{ secrets.ACR_LOGIN_SERVER }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      # 🐳 Build and Tag Image
+      - name: Build Docker Image
+        run: |
+          docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }} .
+          docker tag ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }} ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest
+
+      # 📤 Push Images
+      - name: Push Docker Image
+        run: |
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest
+
+      # 🚀 Deploy on VM via SSH
+      - name: Deploy to VM
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            echo "Logging into ACR..."
+            echo "${{ secrets.ACR_PASSWORD }}" | docker login ${{ secrets.ACR_LOGIN_SERVER }} -u ${{ secrets.ACR_USERNAME }} --password-stdin
+
+            echo "Pulling latest image..."
+            docker pull ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest
+
+            echo "Stopping old container..."
+            docker stop ${{ env.IMAGE_NAME }} || true
+            docker rm ${{ env.IMAGE_NAME }} || true
+
+            echo "Running new container..."
+            docker run -d \
+              --name ${{ env.IMAGE_NAME }} \
+              --restart always \
+              -p 80:8000 \
+              --env-file /home/${{ secrets.VM_USER }}/.env \
+              ${{ secrets.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest
+
+            echo "Cleaning up..."
+            docker image prune -f
+            
+            echo "Deployment successful!"
