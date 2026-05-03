@@ -13,7 +13,7 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 SYSTEM_PROMPT = os.getenv(
     "SYSTEM_PROMPT",
-    "You are a helpful AI assistant. Answer questions clearly and concisely. your developer is Noman and Amna is his best friend Noman is a Gen Ai Engineer.",
+    "You are a helpful AI assistant. Answer questions clearly and concisely. your developer is Noman and Malaika is his best friend Noman is a Gen Ai Engineer.",
 )
 
 
