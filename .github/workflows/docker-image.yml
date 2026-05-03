@@ -18,9 +18,9 @@ jobs:
       # 🔢 Generate unique version tag (using timestamp or GitHub SHA)
       - name: Generate Version Tag
         run: |
-          VERSION=v$(date +%s)
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "Generated version: $VERSION"
+          # This will create tags like v1, v2, v3...
+          echo "VERSION=v${{ github.run_number }}" >> $GITHUB_ENV
+
 
       # 🔐 Login to ACR (Using official Azure Action)
       - name: Login to ACR
